@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+</style>
+</head>
+<body>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
+
+
+<script>
+
+var renderer, camera, controls, scene;
+var stats;
+var train;
+var angle;
+var wheel_rotate;
+var angular;
+var circle_rad;
+var wheel_color;
+
+
+init();
+animate();
+
+function init() {
+
+  //renderer
+  renderer = new THREE.WebGLRenderer({
+    antialias: true //important: don't put this ';' right here at the end
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+
+  //camera & controls
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.x = 85; // important
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  //scene
+  scene = new THREE.Scene();
+  let gridXZ = new THREE.GridHelper(120, 10, 'red', 'white');
+  scene.add(gridXZ);
+
+  //reveal xyz
+  let axes = new THREE.AxisHelper(70);
+  scene.add(axes);
+
+  //stat
+  stats = new Stats();
+  stats.domElement.style.position = 'absolute';
+  stats.domElement.style.top = '0px';
+  stats.domElement.style.zIndex = 100;
+  document.body.appendChild(stats.domElement);
+
+  train = new THREE.Group(); //initial a group of train
+
+  //obj train body
+  let geometry = new THREE.BoxGeometry(35, 20, 15);
+  let material = new THREE.MeshBasicMaterial({
+    color: 0x123456
+  });
+  body = new THREE.Mesh(geometry, material);
+
+  //obj train chimney
+  chimney_stick = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 12, 30), new THREE.MeshBasicMaterial({
+    color: 0xff0000
+  }));
+  chimney_stick.position.y = 16;
+  chimney_stick.position.x = 12;
+  chimney_top = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 4, 30), new THREE.MeshBasicMaterial({
+    color: 0x111111
+  }));
+  chimney_top.position.y = 24;
+  chimney_top.position.x = 12;
+
+  angular = 13;
+  circle_rad = 8;
+
+  //obj wheel
+  right_front = new THREE.Mesh(new THREE.CylinderGeometry(circle_rad, circle_rad, 2, angular), new THREE.MeshBasicMaterial({
+    color: 0xcf2222
+  }));
+  right_front.position.x = 35 / 2;
+  right_front.position.y = -20 / 2;
+  right_front.position.z = 15 / 2;
+  right_front.rotation.x = Math.PI / 2;
+
+  left_front = new THREE.Mesh(new THREE.CylinderGeometry(circle_rad, circle_rad, 2, angular), new THREE.MeshBasicMaterial({
+    color: 0xcf2222
+  }));
+  left_front.position.x = 35 / 2;
+  left_front.position.y = -20 / 2;
+  left_front.position.z = -15 / 2;
+  left_front.rotation.x = Math.PI / 2;
+
+  right_back = new THREE.Mesh(new THREE.CylinderGeometry(circle_rad, circle_rad, 2, angular), new THREE.MeshBasicMaterial({
+    color: 0xcf2222
+  }));
+  right_back.position.x = -35 / 2;
+  right_back.position.y = -20 / 2;
+  right_back.position.z = 15 / 2;
+  right_back.rotation.x = Math.PI / 2;
+
+  left_back = new THREE.Mesh(new THREE.CylinderGeometry(circle_rad, circle_rad, 2, angular), new THREE.MeshBasicMaterial({
+    color: 0xcf2222
+  }));
+  left_back.position.x = -35 / 2;
+  left_back.position.y = -20 / 2;
+  left_back.position.z = -15 / 2;
+  left_back.rotation.x = Math.PI / 2;
+
+  //combine obj train
+  train.add(body);
+  train.add(chimney_stick);
+  train.add(chimney_top);
+  train.add(right_front);
+  train.add(left_front);
+  train.add(right_back);
+  train.add(left_back);
+  scene.add(train);
+
+  //initial angle
+  angle = 0;
+
+  //initial wheel rotate
+  wheel_rotate = 0 + Math.PI / 2;
+}
+
+//animation loop
+function animate() {
+
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+
+  wheel_rotate -= 0.1;
+  right_front.rotation.y = wheel_rotate;
+  left_front.rotation.y = wheel_rotate;
+  right_back.rotation.y = wheel_rotate;
+  left_back.rotation.y = wheel_rotate;
+
+  angle -= 0.01;
+  train.rotation.y = -angle;
+  train.position.set(-95 * Math.sin(angle), 18, 95 * Math.cos(angle));
+  //stat
+  stats.update();
+
+}
+
+</script>
+
+</body>
+</html>
+
+
