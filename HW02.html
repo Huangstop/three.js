@@ -238,7 +238,7 @@ function init() {
   scene.add(sun);
 
   //pucks
-  numOfPucks = 10;
+  numOfPucks = 8;
   realPucksNum = 0;
   var radius;
   var puck;
@@ -248,7 +248,7 @@ function init() {
   var puckX, puckZ, puckRad
   var lengthX, lengthZ;
   var setContinue = false;
-  var audio = new Audio("sound_effect/hockeystick.mp3");
+  var audio = new Audio("sound_effect/BatHitBall.mp3");
   
   while (realPucksNum < numOfPucks) {
     radius = randFloat(8, 16);
@@ -310,7 +310,7 @@ function animate() {
   soundtrack.volume = soundVal;
 
   pucks.forEach(function(p) {
-    p.update(0.2)
+    p.update(0.15)
   });
   pucksBumping(pucks);
 
