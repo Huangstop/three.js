@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #dd2222
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+
+<div id = "info"> 
+	 <br>Sound, BGM, and Collision<br><br>
+	  with BGM (<a href="javascript:toggle();">dimmer</a>)<br>
+	<button id="play" style="width:20%">Play</button> 
+	<br> <a href="https://developers.google.com/web/updates/2017/09/autoplay-policy-changes">Chrome autoplay policy change</a>
+
+</div>
+  
+<audio id="soundtrack" autoplay loop style="display:none">
+<source src="music/LeviathanMagnaSen.mp3" type='audio/mp3'>
+</audio>
+
+<div id="info">HW2_game_physics
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<script>
+
+$('#play').click ( function() {
+	isPaused = !isPaused;
+	if (isPaused) { 
+		$('#play').text ('Play')
+		soundTrack.pause()
+	} else {
+		$('#play').text ('Pause')
+		soundTrack.play()
+	}
+});
+
+var soundTrack;
+var isDimming = false, soundVal = 1.0, sign = 1.0;
+var isPaused = false;
+
+function toggle() {
+	isDimming = !isDimming;
+	sign = isDimming ? -1 : 1;
+	// console.log (isDimming);
+}
+
+
+class motionPuck {
+  //initialize
+  constructor(mesh, radius, coloring, audio) {
+    this.pos = new THREE.Vector3()
+    this.vel = new THREE.Vector3()
+    this.force = new THREE.Vector3()
+    this.mesh = mesh;
+    this.radius = radius;
+	this.audio = audio.cloneNode();
+    //SpotLight( color : Integer, intensity : Float, distance : Float, angle : Radians, penumbra : Float, decay : Float )
+    this.light = new THREE.PointLight(coloring, (radius / 10 * 3), 50);
+    scene.add(this.light)
+    scene.add(this.mesh) // add to scene when particle is created
+
+    //this.mesh.material.color.copy ( coloring.clone() );
+  }
+  update(dt) {
+    this.vel.add(this.force.clone().multiplyScalar(dt))
+    this.pos.add(this.vel.clone().multiplyScalar(dt))
+
+    //wallhitting
+    const CR = 0.98;
+    if (this.pos.z > wall_length - this.radius) {
+      this.pos.z = wall_length - this.radius
+      this.vel.z = -CR * this.vel.z;
+	  this.audio.play();
+    }
+    if (this.pos.z < -wall_length + this.radius) {
+      this.pos.z = -wall_length + this.radius
+      this.vel.z = -CR * this.vel.z;
+	  this.audio.play();
+    }
+    if (this.pos.x > wall_length - this.radius) {
+      this.pos.x = wall_length - this.radius
+      this.vel.x = -CR * this.vel.x;
+	  this.audio.play();
+    }
+    if (this.pos.x < -wall_length + this.radius) {
+      this.pos.x = -wall_length + this.radius
+      this.vel.x = -CR * this.vel.x;
+	  this.audio.play();
+    }
+
+    /*
+    if (this.pos.z > 100 - this.radius) {
+      	const CR = 0.9
+      	this.pos.z = 100 - this.radius
+        this.vel.z = - CR * this.vel.z;
+      }
+    */
+    this.mesh.position.copy(this.pos);
+    this.light.position.copy(this.pos);
+    this.light.position.y += 20;
+  }
+
+}
+
+//var pre_pos = [];
+
+function pucksBumping(pucks) {
+
+  var x_dist, z_dist, center_dist, double_real_center_dist;
+  var vel1, vel2, pos1, pos2, vel1_prime, vel2_prime;
+  var part1, part2, part3;
+  const posAdjustValue = 11.11;
+
+  for (var count = 0; count < (numOfPucks - 1); count++) {
+    for (var count2 = count + 1; count2 < numOfPucks; count2++) {
+
+      x_dist = pucks[count].pos.x - pucks[count2].pos.x;
+      z_dist = pucks[count].pos.z - pucks[count2].pos.z;
+      center_dist = pucks[count].radius + pucks[count2].radius;
+      double_real_center_dist = x_dist * x_dist + z_dist * z_dist;
+      if (double_real_center_dist <= center_dist * center_dist) {
+        vel1 = pucks[count].vel.clone();
+        pos1 = pucks[count].pos.clone();
+        vel2 = pucks[count2].vel.clone();
+        pos2 = pucks[count2].pos.clone();
+
+        //vel_adjustment;  let m1 = m2
+        part1 = (vel1.clone().sub(vel2)).dot(pos1.clone().sub(pos2));
+        part2 = part1 / double_real_center_dist;
+        part3 = pos1.clone().sub(pos2);
+        pucks[count].vel.set(vel1.x - part2 * part3.x, 0, vel1.z - part2 * part3.z);
+
+        //pucks[count].pos = pre_pos[count];
+
+        part1 = (vel1.clone().sub(vel2)).dot(pos1.clone().sub(pos2));
+        part2 = part1 / double_real_center_dist;
+        part3 = pos2.clone().sub(pos1);
+        pucks[count2].vel.set(vel2.x - part2 * part3.x, 0, vel2.z - part2 * part3.z);
+
+        //position adjustment
+        pucks[count].pos.set(pucks[count].pos.x + pucks[count].vel.x / posAdjustValue, 5, pucks[count].pos.z + pucks[count].vel.z / posAdjustValue);
+        pucks[count2].pos.set(pucks[count2].pos.x + pucks[count2].vel.x / posAdjustValue, 5, pucks[count2].pos.z + pucks[count2].vel.z / posAdjustValue)
+        //pucks[count2].pos = pre_pos[count2];
+
+        /*vel1_prime = vel1.clone() - (vel1.clone().sub(vel2)).dot(pos1.clone().sub(pos2)) / double_real_center_dist * pos1.clone().sub(pos2);
+        vel2_prime = vel2.clone() - (vel2.clone().sub(vel1)).dot(pos2.clone().sub(pos1)) / double_real_center_dist * pos2.clone().sub(pos1);*/
+        //pucks[count].vel.set(vel1_prime.x, 0, vel1_prime.z);
+        //pucks[count2].vel.set(vel2_prime.x, 0, vel2_prime.z);
+		
+		pucks[count].audio.play();
+      }
+      //console.log(pucks[0].vel);
+      //console.log(pucks[0].pos);
+      //pre_pos[count] = pucks[count].pos.clone();
+      //pre_pos[count2] = pucks[count].pos.clone();
+    }
+  }
+
+}
+
+
+
+
+var scene, renderer, camera;
+var wall_length;
+var pucks = [];
+var numOfPucks;
+var realPucksNum;
+var colorSets = [0xffffff, 0xffff00, 0xff00ff, 0xff0000, 0x00ffff, 0x00ff00, 0x0000ff];
+//var audio = new Audio("sound_effect/hockeystick.mp3");
+//var audios = [];
+
+init();
+animate();
+
+function init() {
+	
+  soundTrack = document.getElementById ('soundtrack');
+  //horizon initialize
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  renderer.setSize(width, height);
+  renderer.setClearColor(0xeeeeee);
+  document.body.appendChild(renderer.domElement);
+  camera = new THREE.PerspectiveCamera(50, width / height, 1, 10000);
+  camera.position.x = 250;
+  camera.position.y = 300;
+  camera.position.z = 250;
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  scene = new THREE.Scene();
+  let gridXZ = new THREE.GridHelper(500, 20, 'red', 'indigo');
+  scene.add(gridXZ)
+
+  //wall
+  var wall = new THREE.Mesh(new THREE.CylinderGeometry(200, 200, 50, 4, false, 0), new THREE.MeshPhongMaterial({
+    color: 0x888888,
+    opacity: 0.8,
+    transparent: true,
+    side: THREE.DoubleSide
+  }));
+  scene.add(wall);
+  wall.rotation.y = Math.PI / 4;
+  wall.position.y = 25;
+  wall_length = Math.pow((100 * 100 + 100 * 100), (1 / 2));
+
+  //floor
+  var field = new THREE.Mesh(new THREE.CylinderGeometry(200, 200, 2, 4), new THREE.MeshPhongMaterial({
+    color: 0x080808,
+    side: THREE.DoubleSide
+  }));
+  scene.add(field);
+  field.rotation.y = Math.PI / 4;
+  field.position.y = 1;
+
+  //sun
+  var sun = new THREE.PointLight(0xffffff, 2);
+  sun.position.set(0, 1000, 0);
+  scene.add(sun);
+
+  //pucks
+  numOfPucks = 10;
+  realPucksNum = 0;
+  var radius;
+  var puck;
+  var colors;
+  var motioningPuck;
+  var positionX, positionZ;
+  var puckX, puckZ, puckRad
+  var lengthX, lengthZ;
+  var setContinue = false;
+  var audio = new Audio("sound_effect/hockeystick.mp3");
+  
+  while (realPucksNum < numOfPucks) {
+    radius = randFloat(8, 16);
+    positionX = randFloat(-wall_length + radius, wall_length - radius);
+    positionZ = randFloat(-wall_length + radius, wall_length - radius);
+
+    //create position adjustment
+    for (var count = 0; count < pucks.length; count++) {
+      puckX = pucks[count].pos.x;
+      puckZ = pucks[count].pos.z;
+      puckRad = pucks[count].radius;
+      lengthX = puckX - positionX;
+      lengthZ = puckZ - positionZ;
+      if (lengthX * lengthX + lengthZ * lengthZ - puckRad * puckRad - radius * radius < 0) {
+        setContinue = !setContinue;
+        break;
+      }
+    }
+    if (setContinue) {
+      setContinue = !setContinue;
+      continue;
+    }
+
+    colors = colorSets[randInt(0, 6)];
+    puck = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 8, 32), new THREE.MeshPhongMaterial({
+      color: colors,
+      opacity: 0.7,
+      transparent: true,
+      side: THREE.DoubleSide
+    }));
+    //scene.add(puck);
+    motioningPuck = new motionPuck(puck, radius, colors, audio);
+    //puck.position.set(randFloat(-wall_length + radius, wall_length - radius), 5, randFloat(-wall_length + radius, wall_length - radius));
+    motioningPuck.pos.set(positionX, 5, positionZ);
+    //pucks.push(puck);
+    var vel_range = 16;
+    motioningPuck.vel.set(randFloat(-vel_range, vel_range), 0, randFloat(-vel_range, vel_range));
+    pucks.push(motioningPuck);
+
+    //console.log(pucks[count].pos);
+	//audios[count] = audio.cloneNode();
+    realPucksNum++;
+  }
+
+  //initialize prepos
+  /*for(var count2 = 0; count2 < numOfPucks; count2++){
+  	pre_pos[count2] = pucks[count2].pos.clone();
+  }*/
+
+
+  window.addEventListener('resize', onWindowResize, false);
+
+}
+
+function animate() {
+
+  soundVal += sign*0.01;
+  soundVal = THREE.Math.clamp (soundVal, 0, 1);
+  soundtrack.volume = soundVal;
+
+  pucks.forEach(function(p) {
+    p.update(0.2)
+  });
+  pucksBumping(pucks);
+
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+
+}
+
+function onWindowResize() {
+
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+}
+
+function randFloat(low, high) {
+
+  return low + Math.random() * (high - low);
+
+}
+
+function randInt(low, high) {
+
+  return low + Math.floor(Math.random() * (high - low + 1));
+
+}
+
+</script>
+
+</body>
+</html>
+
+
