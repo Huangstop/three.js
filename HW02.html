@@ -70,6 +70,7 @@ class motionPuck {
     this.mesh = mesh;
     this.radius = radius;
 	this.audio = audio.cloneNode();
+	this.audio.volume = 0.3;
     //SpotLight( color : Integer, intensity : Float, distance : Float, angle : Radians, penumbra : Float, decay : Float )
     this.light = new THREE.PointLight(coloring, (radius / 10 * 3), 50);
     scene.add(this.light)
@@ -154,8 +155,15 @@ function pucksBumping(pucks) {
         pucks[count2].vel.set(vel2.x - part2 * part3.x, 0, vel2.z - part2 * part3.z);
 
         //position adjustment
-        pucks[count].pos.set(pucks[count].pos.x + pucks[count].vel.x / posAdjustValue, 5, pucks[count].pos.z + pucks[count].vel.z / posAdjustValue);
-        pucks[count2].pos.set(pucks[count2].pos.x + pucks[count2].vel.x / posAdjustValue, 5, pucks[count2].pos.z + pucks[count2].vel.z / posAdjustValue)
+		let vectorOneTwo = pucks[count2].pos.clone().sub(pucks[count].pos);
+		let overlap = (pucks[count2].radius + pucks[count].radius) - vectorOneTwo.length();
+		vectorOneTwo.normalize();
+		pucks[count].pos.add(vectorOneTwo.clone().multiplyScalar(-overlap/2))
+		pucks[count2].pos.add(vectorOneTwo.clone().multiplyScalar(overlap/2))
+		
+		
+        /*pucks[count].pos.set(pucks[count].pos.x + pucks[count].vel.x / posAdjustValue, 5, pucks[count].pos.z + pucks[count].vel.z / posAdjustValue);
+        pucks[count2].pos.set(pucks[count2].pos.x + pucks[count2].vel.x / posAdjustValue, 5, pucks[count2].pos.z + pucks[count2].vel.z / posAdjustValue)*/
         //pucks[count2].pos = pre_pos[count2];
 
         /*vel1_prime = vel1.clone() - (vel1.clone().sub(vel2)).dot(pos1.clone().sub(pos2)) / double_real_center_dist * pos1.clone().sub(pos2);
@@ -238,7 +246,7 @@ function init() {
   scene.add(sun);
 
   //pucks
-  numOfPucks = 8;
+  numOfPucks = 7;
   realPucksNum = 0;
   var radius;
   var puck;
@@ -251,7 +259,7 @@ function init() {
   var audio = new Audio("sound_effect/BatHitBall.mp3");
   
   while (realPucksNum < numOfPucks) {
-    radius = randFloat(8, 16);
+    radius = randFloat(8, 25);
     positionX = randFloat(-wall_length + radius, wall_length - radius);
     positionZ = randFloat(-wall_length + radius, wall_length - radius);
 
@@ -284,7 +292,7 @@ function init() {
     //puck.position.set(randFloat(-wall_length + radius, wall_length - radius), 5, randFloat(-wall_length + radius, wall_length - radius));
     motioningPuck.pos.set(positionX, 5, positionZ);
     //pucks.push(puck);
-    var vel_range = 16;
+    var vel_range = 50;
     motioningPuck.vel.set(randFloat(-vel_range, vel_range), 0, randFloat(-vel_range, vel_range));
     pucks.push(motioningPuck);
 
@@ -310,7 +318,7 @@ function animate() {
   soundtrack.volume = soundVal;
 
   pucks.forEach(function(p) {
-    p.update(0.15)
+    p.update(0.1)
   });
   pucksBumping(pucks);
 
