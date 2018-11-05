@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #dd2222
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+
+<div id="info">HW3_Keyframe_Animation
+<br>Welcome to see my rainbow man
+<br>pls press play to play music
+<br><button id="play" style="width:20%">Play</button> 
+</div>
+
+<audio id="soundtrack" autoplay loop style="display:none">
+<source src="music/LeviathanMagnaSen.mp3" type='audio/mp3'>
+</audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<script>
+
+/*//////////////////////////////////////////////
+旋轉公式
+有兩物件A、B
+若B將被加入A，且希望B對某個特定質點作旋轉
+那麼我們先假設B的高為100
+也就是說他的Y軸範圍為 -50 ~ 50
+若我們希望把它搬至Y軸的 100 ~ 200並以底面朝下對(0, 100, 0)旋轉
+則 B.position.y = B高/2   (B高/2 = 50)
+A.add(B)
+A.position.set(0, 100, 0);
+這時候原position就會與新position疊加(中心點在(0, 150, 0))
+而旋轉軸就會是新的position  (0, 100, 0)
+結論：
+在被add前的位置會是被add後的相對位置
+而旋轉軸心會是add後的絕對位置的中心
+*/ //////////////////////////////////////////////
+
+var soundTrack;
+var isPaused = false;
+
+$('#play').click ( function() {
+	isPaused = !isPaused;
+	if (isPaused) { 
+		$('#play').text ('Play')
+		soundTrack.pause()
+	} else {
+		$('#play').text ('Pause')
+		soundTrack.play()
+	}
+});
+
+var scene, renderer, camera;
+var dummy, adjust_dummy, karada, atama, migiashi, hidariashi, migite, hidarite;
+
+var T = 8;
+var clock = new THREE.Clock();
+var ts = clock.getElapsedTime()
+var intKey = [];
+var divisor = 32;
+
+
+var Default_pose = { //stand still
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.12709515908380298
+};
+/*          forwarding          */
+var pose1 = { //right foot
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 165,
+  "dummy_posZ": 50,
+  "atama_x": 0.2,
+  "atama_y": -0.5,
+  "atama_z": -0.1,
+  "migiashi_x": -0.5,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.5,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.5,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": -0.5,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.1
+};
+var pose2 = { //stand still
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 100,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.12709515908380298
+};
+var pose3 = { //left foot
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 150,
+  "atama_x": -0.3,
+  "atama_y": 0.5,
+  "atama_z": 0.2,
+  "migiashi_x": 0.5,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": -0.5,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": -0.5,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": 0.5,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.12709515908380298
+};
+var pose4 = { //stand still
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 200,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.12709515908380298
+};
+var pose5 = { //right foot
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 165,
+  "dummy_posZ": 250,
+  "atama_x": 0.2,
+  "atama_y": -0.5,
+  "atama_z": -0.1,
+  "migiashi_x": -0.5,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.5,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.5,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": -0.5,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.1
+};
+var pose6 = { //stand still
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 300,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.12709515908380298
+};
+var pose7 = { //left foot
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 350,
+  "atama_x": -0.3,
+  "atama_y": 0.5,
+  "atama_z": 0.2,
+  "migiashi_x": 0.5,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": -0.5,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": -0.5,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": 0.5,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.12709515908380298
+};
+var pose8 = { // next pose preset
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 400,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": -Math.PI / 3,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+/*          backwarding          */
+var pose9 = { //left foot
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 350,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": -Math.PI / 3,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+var pose10 = { // right foot
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 300,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": -Math.PI / 3,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+var pose11 = { //left foot
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 250,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": -Math.PI / 3,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+var pose12 = { // right foot
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 200,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": -Math.PI / 3,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+var pose13 = { //left foot
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 150,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": -Math.PI / 3,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+var pose14 = { // right foot
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 100,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": -Math.PI / 3,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+var pose15 = { // right foot
+  "dummy_x": -Math.PI / 8,
+  "dummy_y": 0.01,
+  "dummy_z": 0.01,
+  "dummy_posX": 0.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 50,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": -Math.PI / 3,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 2.90,
+  "migite_z": 2.01,
+  "hidarite_x": 0.01,
+  "hidarite_y": -2.80,
+  "hidarite_z": 1.20
+};
+/*          rollover          */
+var pose17 = {
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 0.85,
+  "dummy_posX": -90.01,
+  "dummy_posY": 180,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": -0.81,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 1.61,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 1.61
+};
+var pose18 = {
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 1.75,
+  "dummy_posX": -200,
+  "dummy_posY": 130,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": -1.12,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.99,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 1.61,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 3.01
+};
+var pose19 = {
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 3.05,
+  "dummy_posX": -270,
+  "dummy_posY": 123.45,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": -0.06,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 1.40,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 1.40,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 3.01
+};
+var pose20 = {
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 3.66,
+  "dummy_posX": -350,
+  "dummy_posY": 123.45,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": -0.06,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 1.40,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 1.40,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 3.01
+};
+var pose21 = {
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 4.21,
+  "dummy_posX": -433,
+  "dummy_posY": 141.23,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": -0.06,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 1.40,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 1.40,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 3.01
+};
+var pose22 = {
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": 4.61,
+  "dummy_posX": -550,
+  "dummy_posY": 141.23,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": -0.06,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 1.40,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 1.40,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 3.31
+};
+var pose23 = {
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": Math.PI*2,
+  "dummy_posX": -570,
+  "dummy_posY": 180,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 1.5807963267948966,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 1.5807963267948966
+}
+var pose24 = { //stand still
+  "dummy_x": 0.01,
+  "dummy_y": 0.01,
+  "dummy_z": Math.PI*2,
+  "dummy_posX": -570,
+  "dummy_posY": 180,
+  "dummy_posZ": 0.01,
+  "atama_x": 0.01,
+  "atama_y": 0.01,
+  "atama_z": 0.01,
+  "migiashi_x": 0.01,
+  "migiashi_y": 0.01,
+  "migiashi_z": 0.01,
+  "hidariashi_x": 0.01,
+  "hidariashi_y": 0.01,
+  "hidariashi_z": 0.01,
+  "migite_x": 0.01,
+  "migite_y": 0.01,
+  "migite_z": 2.9963528553600183,
+  "hidarite_x": 0.01,
+  "hidarite_y": 0.01,
+  "hidarite_z": 0.12709515908380298
+};
+
+var keys = [
+  [1 / divisor * 0, Default_pose],
+  //forwarding
+  [1 / divisor * 1, pose1],
+  [1 / divisor * 2, pose2],
+  [1 / divisor * 3, pose3],
+  [1 / divisor * 4, pose4],
+  [1 / divisor * 5, pose5],
+  [1 / divisor * 6, pose6],
+  [1 / divisor * 7, pose7],
+  [1 / divisor * 8, pose8],
+  //backwarding
+  [1 / divisor * 9, pose9],
+  [1 / divisor * 10, pose10],
+  [1 / divisor * 11, pose11],
+  [1 / divisor * 12, pose12],
+  [1 / divisor * 13, pose13],
+  [1 / divisor * 14, pose14],
+  [1 / divisor * 15, pose15],
+  [1 / divisor * 16, Default_pose],
+  //rollover
+  [1 / divisor * 17, pose17],
+  [1 / divisor * 18, pose18],
+  [1 / divisor * 19, pose19],
+  [1 / divisor * 20, pose20],
+  [1 / divisor * 21, pose21],
+  [1 / divisor * 22, pose22],
+  [1 / divisor * 23, pose23],
+  [1 / divisor * 24, pose24],
+  [1 / divisor * 25, pose23],
+  [1 / divisor * 26, pose22],
+  [1 / divisor * 27, pose21],
+  [1 / divisor * 28, pose20],
+  [1 / divisor * 29, pose19],
+  [1 / divisor * 30, pose18],
+  [1 / divisor * 31, pose17],
+  //default
+  [1 / divisor * 32, Default_pose]
+];
+
+init();
+animate();
+
+/*
+function loadJSON() {
+
+}
+*/
+
+function init() {
+
+  soundTrack = document.getElementById ('soundtrack');
+
+  //horizon initialize
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  renderer.setSize(width, height);
+  renderer.setClearColor(0xeeeeee);
+  document.body.appendChild(renderer.domElement);
+  camera = new THREE.PerspectiveCamera(50, width / height, 1, 10000);
+  camera.position.y = 750;
+  camera.position.z = 1000;
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  scene = new THREE.Scene();
+  let gridXZ = new THREE.GridHelper(1000, 20, 'red', 'indigo');
+  scene.add(gridXZ);
+
+  //light
+  var light1 = new THREE.PointLight(0xff0000, 3);
+  light1.position.set(1500, 500, 1000);
+  scene.add(light1);
+  var light2 = new THREE.PointLight(0x00aa00, 2);
+  light2.position.set(0, 500, 1000);
+  scene.add(light2);
+  var light3 = new THREE.PointLight(0x0000ff, 3);
+  light3.position.set(-1500, 500, 1000);
+  scene.add(light3);
+
+  /*          dummy          */
+  var white = 0xffffff,
+    dark = 0x888888,
+    black = 0x000000,
+    darken = 0x444444;
+  var Geo, Mat, Mesh, karadaY = 180;
+  dummy = new THREE.Object3D();
+  adjust_dummy = new THREE.Object3D();
+  //karada
+  var karadaH = 80,
+    karadaW = 60;
+  Geo = new THREE.BoxGeometry(karadaW, karadaH, 26)
+  Mat = new THREE.MeshPhongMaterial({
+    color: black
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  //Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = karadaY;
+  karada = new THREE.Object3D();
+  karada.add(Mesh);
+  //atama
+  var atamaH = 24;
+  Geo = new THREE.CylinderGeometry(13, 8, atamaH, 36);
+  Mat = new THREE.MeshPhongMaterial({
+    color: white
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  //Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = 15;
+  atama = new THREE.Object3D();
+  atama.add(Mesh);
+  atama.position.set(0, karadaY + karadaH / 2 + atamaH / 2 - 15, 0);
+  //ashi//
+  var ashiH = 140;
+  //migiashi
+  Geo = new THREE.CylinderGeometry(13, 8, ashiH, 36);
+  Mat = new THREE.MeshPhongMaterial({
+    color: dark
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  //Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = -ashiH / 2;
+  migiashi = new THREE.Object3D();
+  migiashi.add(Mesh);
+  migiashi.position.set(-karadaW / 2 + 14, ashiH, 0);
+  //hidariashi
+  Geo = new THREE.CylinderGeometry(13, 8, ashiH, 36);
+  Mat = new THREE.MeshPhongMaterial({
+    color: dark
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  //Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = -ashiH / 2;
+  hidariashi = new THREE.Object3D();
+  hidariashi.add(Mesh);
+  hidariashi.position.set(karadaW / 2 - 14, ashiH, 0);
+  //te//
+  var teH = 100,
+    teS = 20;
+  //migite
+  Geo = new THREE.BoxGeometry(teS, teH, teS)
+  Mat = new THREE.MeshPhongMaterial({
+    color: darken
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  //Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.x = 0;
+  Mesh.position.y = teH / 2;
+  migite = new THREE.Object3D();
+  migite.add(Mesh);
+  migite.position.set(-karadaW / 2, karadaY + karadaH / 2 - teS / 2, 0);
+  //hidarite
+  Geo = new THREE.BoxGeometry(teS, teH, teS)
+  Mat = new THREE.MeshPhongMaterial({
+    color: darken
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  //Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.x = 0;
+  Mesh.position.y = -teH / 2;
+  hidarite = new THREE.Object3D();
+  hidarite.add(Mesh);
+  hidarite.position.set(karadaW / 2, karadaY + karadaH / 2 - teS / 2, 0);
+  //dummy combination
+  adjust_dummy.add(karada);
+  adjust_dummy.add(atama);
+  adjust_dummy.add(migiashi);
+  adjust_dummy.add(hidariashi);
+  adjust_dummy.add(migite);
+  adjust_dummy.add(hidarite);
+  adjust_dummy.position.set(0, -karadaY, 0);
+  //show dummy
+  dummy.add(adjust_dummy);
+  scene.add(dummy);
+
+  //gcontrol
+  gcontrol = {
+    //dummy
+    dummy_x: 0.01,
+    dummy_y: 0.01,
+    dummy_z: 0.01,
+    dummy_posX: 0.01,
+    dummy_posY: karadaY,
+    dummy_posZ: 0.01,
+    //atama
+    atama_x: 0.01,
+    atama_y: 0.01,
+    atama_z: 0.01,
+    //migiashi
+    migiashi_x: 0.01,
+    migiashi_y: 0.01,
+    migiashi_z: 0.01,
+    //hidariashi
+    hidariashi_x: 0.01,
+    hidariashi_y: 0.01,
+    hidariashi_z: 0.01,
+    //migite
+    migite_x: 0.01,
+    migite_y: 0.01,
+    migite_z: Math.PI / 2 + 0.01,
+    //hidarite
+    hidarite_x: 0.01,
+    hidarite_y: 0.01,
+    hidarite_z: Math.PI / 2 + 0.01
+  };
+
+  /*
+  var gui = new dat.GUI();
+  gui.domElement.id = 'gui';
+  gui.remember(gcontrol);
+  //dummy
+  gui.add(gcontrol, 'dummy_x', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'dummy_y', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'dummy_z', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'dummy_posX', -250.01, 250.01);
+  gui.add(gcontrol, 'dummy_posY', 130.01, 400.01);
+  gui.add(gcontrol, 'dummy_posZ', -250.01, 250.01);
+  //atama
+  gui.add(gcontrol, 'atama_x', -1.21, 1.21);
+  gui.add(gcontrol, 'atama_y', -0.91, 0.91);
+  gui.add(gcontrol, 'atama_z', -0.91, 0.91);
+  //migiashi
+  gui.add(gcontrol, 'migiashi_x', -Math.PI + 0.21, Math.PI - 0.21);
+  gui.add(gcontrol, 'migiashi_y', -1.01, 1.01);
+  gui.add(gcontrol, 'migiashi_z', -Math.PI / 2 + 0.01, Math.PI / 4 - 0.01);
+  //hidariashi
+  gui.add(gcontrol, 'hidariashi_x', -Math.PI + 0.21, Math.PI - 0.21);
+  gui.add(gcontrol, 'hidariashi_y', -1.01, 1.01);
+  gui.add(gcontrol, 'hidariashi_z', -Math.PI / 4 + 0.01, Math.PI / 2 - 0.01);
+  //migite
+  gui.add(gcontrol, 'migite_x', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'migite_y', -Math.PI / 2 - 0.11, Math.PI - 0.22);
+  gui.add(gcontrol, 'migite_z', -Math.PI / 2 - 0.01, Math.PI * 1.5 + 0.01);
+  //hidarite
+  gui.add(gcontrol, 'hidarite_x', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'hidarite_y', -Math.PI - 0.11, Math.PI / 2 - 0.22);
+  gui.add(gcontrol, 'hidarite_z', -Math.PI / 2 - 0.01, Math.PI * 1.5 + 0.01);
+  */
+
+  //window resize
+  window.addEventListener('resize', onWindowResize, false);
+}
+
+function animate() {
+  keyframe(clock.getElapsedTime());
+  requestAnimationFrame(animate);
+  render();
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function render() {
+  //dummy
+  dummy.rotation.x = intKey[0];
+  dummy.rotation.y = intKey[1];
+  dummy.rotation.z = intKey[2];
+  dummy.position.x = intKey[3];
+  dummy.position.y = intKey[4];
+  dummy.position.z = intKey[5];
+  //atama
+  atama.rotation.x = intKey[6];
+  atama.rotation.y = intKey[7];
+  atama.rotation.z = intKey[8];
+  //migiashi
+  migiashi.rotation.x = intKey[9];
+  migiashi.rotation.y = intKey[10];
+  migiashi.rotation.z = intKey[11];
+  //hidariashi
+  hidariashi.rotation.x = intKey[12];
+  hidariashi.rotation.y = intKey[13];
+  hidariashi.rotation.z = intKey[14];
+  //migite
+  migite.rotation.x = intKey[15];
+  migite.rotation.y = intKey[16];
+  migite.rotation.z = intKey[17];
+  //hidarite
+  hidarite.rotation.x = intKey[18];
+  hidarite.rotation.y = intKey[19];
+  hidarite.rotation.z = intKey[20];
+
+  /*
+  //dummy
+  dummy.rotation.x = gcontrol.dummy_x;
+  dummy.rotation.y = gcontrol.dummy_y;
+  dummy.rotation.z = gcontrol.dummy_z;
+  dummy.position.x = gcontrol.dummy_posX;
+  dummy.position.y = gcontrol.dummy_posY;
+  dummy.position.z = gcontrol.dummy_posZ;
+  //atama
+  atama.rotation.x = gcontrol.atama_x;
+  atama.rotation.y = gcontrol.atama_y;
+  atama.rotation.z = gcontrol.atama_z;
+  //migiashi
+  migiashi.rotation.x = gcontrol.migiashi_x;
+  migiashi.rotation.y = gcontrol.migiashi_y;
+  migiashi.rotation.z = gcontrol.migiashi_z;
+  //hidariashi
+  hidariashi.rotation.x = gcontrol.hidariashi_x;
+  hidariashi.rotation.y = gcontrol.hidariashi_y;
+  hidariashi.rotation.z = gcontrol.hidariashi_z;
+  //migite
+  migite.rotation.x = gcontrol.migite_x;
+  migite.rotation.y = gcontrol.migite_y;
+  migite.rotation.z = gcontrol.migite_z;
+  //hidarite
+  hidarite.rotation.x = gcontrol.hidarite_x;
+  hidarite.rotation.y = gcontrol.hidarite_y;
+  hidarite.rotation.z = gcontrol.hidarite_z;
+  */
+
+  renderer.render(scene, camera);
+}
+
+function keyframe(t) {
+  var s = ((t - ts) % T) / T;
+
+  for (var i = 1; i < keys.length; i++) {
+    if (keys[i][0] > s) break;
+  }
+  var ii = i - 1;
+  var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+
+  //dummy
+  dummy_x = keys[ii][1].dummy_x * (1 - a) + keys[ii + 1][1].dummy_x * a;
+  dummy_y = keys[ii][1].dummy_y * (1 - a) + keys[ii + 1][1].dummy_y * a;
+  dummy_z = keys[ii][1].dummy_z * (1 - a) + keys[ii + 1][1].dummy_z * a;
+  dummy_posX = keys[ii][1].dummy_posX * (1 - a) + keys[ii + 1][1].dummy_posX * a;
+  dummy_posY = keys[ii][1].dummy_posY * (1 - a) + keys[ii + 1][1].dummy_posY * a;
+  dummy_posZ = keys[ii][1].dummy_posZ * (1 - a) + keys[ii + 1][1].dummy_posZ * a;
+  //atama
+  atama_x = keys[ii][1].atama_x * (1 - a) + keys[ii + 1][1].atama_x * a;
+  atama_y = keys[ii][1].atama_y * (1 - a) + keys[ii + 1][1].atama_y * a;
+  atama_z = keys[ii][1].atama_z * (1 - a) + keys[ii + 1][1].atama_z * a;
+  //migiashi
+  migiashi_x = keys[ii][1].migiashi_x * (1 - a) + keys[ii + 1][1].migiashi_x * a;
+  migiashi_y = keys[ii][1].migiashi_y * (1 - a) + keys[ii + 1][1].migiashi_y * a;
+  migiashi_z = keys[ii][1].migiashi_z * (1 - a) + keys[ii + 1][1].migiashi_z * a;
+  //hidariashi
+  hidariashi_x = keys[ii][1].hidariashi_x * (1 - a) + keys[ii + 1][1].hidariashi_x * a;
+  hidariashi_y = keys[ii][1].hidariashi_y * (1 - a) + keys[ii + 1][1].hidariashi_y * a;
+  hidariashi_z = keys[ii][1].hidariashi_z * (1 - a) + keys[ii + 1][1].hidariashi_z * a;
+  //migite
+  migite_x = keys[ii][1].migite_x * (1 - a) + keys[ii + 1][1].migite_x * a;
+  migite_y = keys[ii][1].migite_y * (1 - a) + keys[ii + 1][1].migite_y * a;
+  migite_z = keys[ii][1].migite_z * (1 - a) + keys[ii + 1][1].migite_z * a;
+  //hidarite
+  hidarite_x = keys[ii][1].hidarite_x * (1 - a) + keys[ii + 1][1].hidarite_x * a;
+  hidarite_y = keys[ii][1].hidarite_y * (1 - a) + keys[ii + 1][1].hidarite_y * a;
+  hidarite_z = keys[ii][1].hidarite_z * (1 - a) + keys[ii + 1][1].hidarite_z * a;
+
+  intKey = [dummy_x, dummy_y, dummy_z, dummy_posX, dummy_posY, dummy_posZ, atama_x, atama_y, atama_z, migiashi_x, migiashi_y, migiashi_z, hidariashi_x, hidariashi_y, hidariashi_z, migite_x, migite_y, migite_z, hidarite_x, hidarite_y, hidarite_z];
+}
+
+
+</script>
+
+</body>
+</html>
+
+

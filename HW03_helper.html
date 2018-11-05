@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #dd2222
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+
+<div id="info">HW3_Keyframe_Animation
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
+
+<script>
+
+var scene, renderer, camera;
+var dummy, adjust_dummy, karada, atama, migiashi, hidariashi, migite, hidarite;
+
+
+init();
+animate();
+
+function loadJSON() {
+
+}
+
+/*//////////////////////////////////////////////
+旋轉公式
+有兩物件A、B
+若B將被加入A，且希望B對某個特定質點作旋轉
+那麼我們先假設B的高為100
+也就是說他的Y軸範圍為 -50 ~ 50
+若我們希望把它搬至Y軸的 100 ~ 200並以底面朝下對(0, 100, 0)旋轉
+則 B.position.y = B高/2   (B高/2 = 50)
+A.add(B)
+A.position.set(0, 100, 0);
+這時候原position就會與新position疊加(中心點在(0, 150, 0))
+而旋轉軸就會是新的position  (0, 100, 0)
+結論：
+在被add前的位置會是被add後的相對位置
+而旋轉軸心會是add後的絕對位置的中心
+*///////////////////////////////////////////////
+
+function init() {
+  //horizon initialize
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  renderer.setSize(width, height);
+  renderer.setClearColor(0xeeeeee);
+  document.body.appendChild(renderer.domElement);
+  camera = new THREE.PerspectiveCamera(50, width / height, 1, 10000);
+  camera.position.y = 300;
+  camera.position.z = 500;
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  scene = new THREE.Scene();
+  let gridXZ = new THREE.GridHelper(500, 20, 'red', 'indigo');
+  scene.add(gridXZ);
+
+  //light
+  var light1 = new THREE.PointLight(0xcc0000, 3);
+  light1.position.set(1500, 500, 1000);
+  scene.add(light1);
+  var light2 = new THREE.PointLight(0x00cc00, 3);
+  light2.position.set(0, 500, 1000);
+  scene.add(light2);
+  var light3 = new THREE.PointLight(0x0000cc, 3);
+  light3.position.set(-1500, 500, 1000);
+  scene.add(light3);
+
+  /*          dummy          */
+  var white = 0xffffff,
+    dark = 0x888888,
+    black = 0x000000,
+    darken = 0x444444;
+  var Geo, Mat, Mesh, karadaY = 180;
+  dummy = new THREE.Object3D();
+  adjust_dummy = new THREE.Object3D();
+  //karada
+  var karadaH = 80,
+    karadaW = 60;
+  Geo = new THREE.BoxGeometry(karadaW, karadaH, 26)
+  Mat = new THREE.MeshPhongMaterial({
+    color: black
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = karadaY;
+  karada = new THREE.Object3D();
+  karada.add(Mesh);
+  //atama
+  var atamaH = 24;
+  Geo = new THREE.CylinderGeometry(13, 8, atamaH, 36);
+  Mat = new THREE.MeshPhongMaterial({
+    color: white
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = 15;
+  atama = new THREE.Object3D();
+  atama.add(Mesh);
+  atama.position.set(0, karadaY + karadaH / 2 + atamaH / 2 - 15, 0);
+  //ashi//
+  var ashiH = 140;
+  //migiashi
+  Geo = new THREE.CylinderGeometry(13, 8, ashiH, 36);
+  Mat = new THREE.MeshPhongMaterial({
+    color: dark
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = -ashiH / 2;
+  migiashi = new THREE.Object3D();
+  migiashi.add(Mesh);
+  migiashi.position.set(-karadaW / 2 + 14, ashiH, 0);
+  //hidariashi
+  Geo = new THREE.CylinderGeometry(13, 8, ashiH, 36);
+  Mat = new THREE.MeshPhongMaterial({
+    color: dark
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.y = -ashiH / 2;
+  hidariashi = new THREE.Object3D();
+  hidariashi.add(Mesh);
+  hidariashi.position.set(karadaW / 2 - 14, ashiH, 0);
+  //te//
+  var teH = 100,
+    teS = 20;
+  //migite
+  Geo = new THREE.BoxGeometry(teS, teH, teS)
+  Mat = new THREE.MeshPhongMaterial({
+    color: darken
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.x = 0;
+  Mesh.position.y = teH / 2;
+  migite = new THREE.Object3D();
+  migite.add(Mesh);
+  migite.position.set(-karadaW / 2, karadaY + karadaH / 2 - teS / 2, 0);
+  //hidarite
+  Geo = new THREE.BoxGeometry(teS, teH, teS)
+  Mat = new THREE.MeshPhongMaterial({
+    color: darken
+  });
+  Mesh = new THREE.Mesh(Geo, Mat);
+  Mesh.add(new THREE.AxisHelper(100));
+  Mesh.position.x = 0;
+  Mesh.position.y = - teH / 2;
+  hidarite = new THREE.Object3D();
+  hidarite.add(Mesh);
+  hidarite.position.set(karadaW / 2, karadaY + karadaH / 2 - teS / 2 , 0);
+  //dummy combination
+  adjust_dummy.add(karada);
+  adjust_dummy.add(atama);
+  adjust_dummy.add(migiashi);
+  adjust_dummy.add(hidariashi);
+  adjust_dummy.add(migite);
+  adjust_dummy.add(hidarite);
+  adjust_dummy.position.set(0, -karadaY, 0);
+  //show dummy
+  dummy.add(adjust_dummy);
+  scene.add(dummy);
+
+  //gcontrol
+  gcontrol = {
+    //dummy
+    dummy_x: 0.01,
+    dummy_y: 0.01,
+    dummy_z: 0.01,
+    dummy_posX: 0.01,
+    dummy_posY: karadaY,
+    dummy_posZ: 0.01,
+    //atama
+    atama_x: 0.01,
+    atama_y: 0.01,
+    atama_z: 0.01,
+    //migiashi
+    migiashi_x: 0.01,
+    migiashi_y: 0.01,
+    migiashi_z: 0.01,
+    //hidariashi
+    hidariashi_x: 0.01,
+    hidariashi_y: 0.01,
+    hidariashi_z: 0.01,
+    //migite
+    migite_x: 0.01,
+    migite_y: 0.01,
+    migite_z: Math.PI/2 + 0.01,
+    //hidarite
+    hidarite_x: 0.01,
+    hidarite_y: 0.01,
+    hidarite_z: Math.PI/2 + 0.01
+  };
+  var gui = new dat.GUI();
+  gui.domElement.id = 'gui';
+  gui.remember(gcontrol);
+  //dummy
+  gui.add(gcontrol, 'dummy_x', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'dummy_y', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'dummy_z', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'dummy_posX', -250.01, 250.01);
+  gui.add(gcontrol, 'dummy_posY', 130.01, 400.01);
+  gui.add(gcontrol, 'dummy_posZ', -250.01, 250.01);
+  //atama
+  gui.add(gcontrol, 'atama_x', -1.21, 1.21);
+  gui.add(gcontrol, 'atama_y', -0.91, 0.91);
+  gui.add(gcontrol, 'atama_z', -0.91, 0.91);
+  //migiashi
+  gui.add(gcontrol, 'migiashi_x', -Math.PI + 0.21, Math.PI - 0.21);
+  gui.add(gcontrol, 'migiashi_y', -1.01, 1.01);
+  gui.add(gcontrol, 'migiashi_z', -Math.PI/2 + 0.01, Math.PI/4 -0.01);
+  //hidariashi
+  gui.add(gcontrol, 'hidariashi_x', -Math.PI + 0.21, Math.PI - 0.21);
+  gui.add(gcontrol, 'hidariashi_y', -1.01, 1.01);
+  gui.add(gcontrol, 'hidariashi_z', -Math.PI/4 + 0.01, Math.PI/2 - 0.01);
+  //migite
+  gui.add(gcontrol, 'migite_x', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'migite_y', -Math.PI/2 - 0.11, Math.PI - 0.22);
+  gui.add(gcontrol, 'migite_z', -Math.PI/2 - 0.01, Math.PI*1.5 + 0.01);
+  //hidarite
+  gui.add(gcontrol, 'hidarite_x', -Math.PI - 0.01, Math.PI + 0.01);
+  gui.add(gcontrol, 'hidarite_y', -Math.PI - 0.11, Math.PI/2 - 0.22);
+  gui.add(gcontrol, 'hidarite_z', -Math.PI/2 - 0.01, Math.PI*1.5 + 0.01);
+
+  //window resize
+  window.addEventListener('resize', onWindowResize, false);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  render();
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function render() {
+  //dummy
+  dummy.rotation.x = gcontrol.dummy_x;
+  dummy.rotation.y = gcontrol.dummy_y;
+  dummy.rotation.z = gcontrol.dummy_z;
+  dummy.position.x = gcontrol.dummy_posX;
+  dummy.position.y = gcontrol.dummy_posY;
+  dummy.position.z = gcontrol.dummy_posZ;
+  //atama
+  atama.rotation.x = gcontrol.atama_x;
+  atama.rotation.y = gcontrol.atama_y;
+  atama.rotation.z = gcontrol.atama_z;
+  //migiashi
+  migiashi.rotation.x = gcontrol.migiashi_x;
+  migiashi.rotation.y = gcontrol.migiashi_y;
+  migiashi.rotation.z = gcontrol.migiashi_z;
+  //hidariashi
+  hidariashi.rotation.x = gcontrol.hidariashi_x;
+  hidariashi.rotation.y = gcontrol.hidariashi_y;
+  hidariashi.rotation.z = gcontrol.hidariashi_z;
+  //migite
+  migite.rotation.x = gcontrol.migite_x;
+  migite.rotation.y = gcontrol.migite_y;
+  migite.rotation.z = gcontrol.migite_z;
+  //hidarite
+  hidarite.rotation.x = gcontrol.hidarite_x;
+  hidarite.rotation.y = gcontrol.hidarite_y;
+  hidarite.rotation.z = gcontrol.hidarite_z;
+
+  renderer.render(scene, camera);
+}
+
+
+</script>
+
+</body>
+</html>
+
+
