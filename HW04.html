@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #dd2222
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+
+<div id="info">HW4_Inverse_kinematics
+<br>pls press play to play music
+<br><button id="play" style="width:20%">Play</button> 
+</div>
+
+<audio id="soundtrack" autoplay loop style="display:none">
+<source src="music/LeviathanMagnaSen.mp3" type='audio/mp3'>
+</audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
+<script src="https://jyunming-chen.github.io/game3js/js/ccdsys.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<script>
+
+/*//////////////////////////////////////////////
+旋轉公式
+有兩物件A、B
+若B將被加入A，且希望B對某個特定質點作旋轉
+那麼我們先假設B的高為100
+也就是說他的Y軸範圍為 -50 ~ 50
+若我們希望把它搬至Y軸的 100 ~ 200並以底面朝下對(0, 100, 0)旋轉
+則 B.position.y = B高/2   (B高/2 = 50)
+A.add(B)
+A.position.set(0, 100, 0);
+這時候原position就會與新position疊加(中心點在(0, 150, 0))
+而旋轉軸就會是新的position  (0, 100, 0)
+結論：
+在被add前的位置會是被add後的相對位置
+而旋轉軸心會是add後的絕對位置的中心
+*/ //////////////////////////////////////////////
+
+var soundTrack;
+var isPaused = false;
+
+$('#play').click ( function() {
+	isPaused = !isPaused;
+	if (isPaused) { 
+		$('#play').text ('Play')
+		soundTrack.pause()
+	} else {
+		$('#play').text ('Pause')
+		soundTrack.play()
+	}
+});
+
+var camera, scene, renderer;
+var planes = [];
+var pucks = [];
+var numOfPucks;
+
+var twoLinkArm, twoLink;
+var raycaster;
+
+var mouse = new THREE.Vector2();
+var pickables = [];
+var clock = new THREE.Clock();
+var paddlePos = new THREE.Vector3();
+var dot;
+
+var time;
+
+class motionPuck {
+  //initialize
+  constructor(mesh, radius, coloring, audio) {
+    this.pos = new THREE.Vector3()
+    this.vel = new THREE.Vector3()
+    this.force = new THREE.Vector3()
+    this.mesh = mesh;
+    this.radius = radius;
+	this.audio = audio.cloneNode();
+	this.audio.volume = 0.3;
+    scene.add(this.mesh);
+  }
+  update(dt) {
+    this.vel.add(this.force.clone().multiplyScalar(dt));
+    this.pos.add(this.vel.clone().multiplyScalar(dt));
+    this.collidingPlanes(planes);
+    this.mesh.position.copy(this.pos);
+  }
+  collidingPlanes(planes) {
+    const EPS = 1e-3;
+    const CR = 0.997;
+    for (let i = 0; i < planes.length; i++) {
+      let plane = planes[i];
+      let point = this.pos.clone().sub(plane.ptOnPl);
+      if (point.dot(plane.normal) < EPS + this.radius) {
+        //pos_adjustment
+        this.pos.copy(plane.ptOnPl.clone().add(point.projectOnPlane(plane.normal)));
+        this.pos.add(plane.normal.clone().multiplyScalar(this.radius));
+        //vel_adjustment
+        this.vel.sub(plane.normal.clone().multiplyScalar((1 + CR) * this.vel.dot(plane.normal)));
+		this.audio.play();
+      }
+    }
+  }
+}
+
+function pucksBumping(pucks) {
+
+  var x_dist, z_dist, center_dist, double_real_center_dist;
+  var vel1, vel2, pos1, pos2, vel1_prime, vel2_prime;
+  var part1, part2, part3;
+  const posAdjustValue = 11.11;
+
+  for (var count = 0; count < (numOfPucks - 1); count++) {
+    for (var count2 = count + 1; count2 < numOfPucks; count2++) {
+
+      x_dist = pucks[count].pos.x - pucks[count2].pos.x;
+      z_dist = pucks[count].pos.z - pucks[count2].pos.z;
+      center_dist = pucks[count].radius + pucks[count2].radius;
+      double_real_center_dist = x_dist * x_dist + z_dist * z_dist;
+      if (double_real_center_dist <= center_dist * center_dist) {
+        vel1 = pucks[count].vel.clone();
+        pos1 = pucks[count].pos.clone();
+        vel2 = pucks[count2].vel.clone();
+        pos2 = pucks[count2].pos.clone();
+
+        //vel_adjustment;  let m1 = m2
+        part1 = (vel1.clone().sub(vel2)).dot(pos1.clone().sub(pos2));
+        part2 = part1 / double_real_center_dist;
+        part3 = pos1.clone().sub(pos2);
+        pucks[count].vel.set(vel1.x - part2 * part3.x, 0, vel1.z - part2 * part3.z);
+
+        part1 = (vel1.clone().sub(vel2)).dot(pos1.clone().sub(pos2));
+        part2 = part1 / double_real_center_dist;
+        part3 = pos2.clone().sub(pos1);
+        pucks[count2].vel.set(vel2.x - part2 * part3.x, 0, vel2.z - part2 * part3.z);
+
+        //position adjustment
+        pucks[count].pos.set(pucks[count].pos.x + pucks[count].vel.x / posAdjustValue, 5, pucks[count].pos.z + pucks[count].vel.z / posAdjustValue);
+        pucks[count2].pos.set(pucks[count2].pos.x + pucks[count2].vel.x / posAdjustValue, 5, pucks[count2].pos.z + pucks[count2].vel.z / posAdjustValue)
+      }
+    }
+  }
+}
+
+class Plane {
+  constructor(localPointOnPlane, localNormal, mesh) {
+    this.localPtOnPl = localPointOnPlane.clone();
+    this.localNormal = localNormal.clone();
+    this.mesh = mesh; // the graphics representation;
+    scene.add(mesh);
+  }
+  update() {
+    this.mesh.updateMatrixWorld() // important!
+    this.ptOnPl = this.mesh.localToWorld(this.localPtOnPl.clone());
+    let normalMat = new THREE.Matrix3().getNormalMatrix(this.mesh.matrixWorld);
+    this.normal = this.localNormal.clone().applyMatrix3(normalMat).normalize();
+  }
+}
+
+class TwoLinkArm {
+	constructor () {
+  	this.theta1 = 0;
+    this.theta2 = 0;
+  }
+  init () {
+  let twoLink = new THREE.Object3D();
+  
+ 	let mat = new THREE.MeshNormalMaterial()
+	this.link1 = new THREE.Object3D();
+  this.link1.add (new THREE.AxisHelper (10))
+  let mesh = new THREE.Mesh (new THREE.BoxGeometry (150,10,20), mat)
+  this.link1.add (mesh);
+  mesh.position.x = 75
+
+twoLink.add (this.link1)
+	
+  this.link2 = new THREE.Object3D();
+  this.link2.add (new THREE.AxisHelper (10))
+  let mesh2 = new THREE.Mesh (new THREE.BoxGeometry (100, 10, 20), mat)
+  this.link2.add (mesh2);
+  mesh2.position.x = 50
+  
+  this.link1.add (this.link2)
+  this.link2.position.x = 150
+  
+  let paddle = new THREE.Mesh (new THREE.CylinderGeometry (25, 25, 20, 32), mat)
+  this.link2.add (paddle)
+  paddle.position.x = 75
+ 	
+  return twoLink;
+  
+  }
+  update (thetas) {
+  	this.theta1 = thetas[0]
+    this.theta2 = thetas[1]
+    this.link1.rotation.y = this.theta1
+  	this.link2.rotation.y = this.theta2
+  }
+}
+
+init();
+animate();
+
+function fk (thetas, joints) {  // all memory assumed in place
+  joints[0].set (0,0,0);
+  
+  var localzero = new THREE.Vector3(0, 0, 0);
+  var m = new THREE.Matrix4();
+  m.makeRotationY(thetas[0]);
+  m.multiply(new THREE.Matrix4().makeTranslation(90, 0, 0));
+  localzero.applyMatrix4(m);
+  joints[1].copy(localzero);
+
+  localzero.set(0, 0, 0);
+  m.multiply(new THREE.Matrix4().makeRotationY(thetas[1]));
+  m.multiply(new THREE.Matrix4().makeTranslation(90, 0, 0));
+  localzero.applyMatrix4(m);
+  joints[2].copy(localzero);
+}
+
+function init() {
+
+  soundTrack = document.getElementById ('soundtrack');
+  var audio = new Audio("sound_effect/BatHitBall.mp3");
+
+	clock.start();
+    
+	//horizon initialize
+	renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  renderer.setSize(width, height);
+  renderer.setClearColor(0xeeeeee);
+  document.body.appendChild(renderer.domElement);
+  camera = new THREE.PerspectiveCamera(50, width / height, 1, 10000);
+  camera.position.y = 1000;
+  camera.position.z = 750;
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  //controls = new THREE.OrbitControls(camera, renderer.domElement);
+  scene = new THREE.Scene();
+  camera.lookAt(scene.position);
+  let gridXZ = new THREE.GridHelper(1000, 20, 'red', 'indigo');
+  scene.add(gridXZ);
+  
+  /*------------table------------*/
+  //pilar
+  var pillar, pSide = 50, pHeight = 200;
+	pillar = new THREE.Mesh(new THREE.BoxGeometry(pSide, pHeight, pSide), new THREE.MeshPhongMaterial({
+    color: 0x002c00,
+    side: THREE.DoubleSide
+  }));
+  scene.add(pillar);
+  pillar.position.x = 250 - pSide / 2;
+ 	pillar.position.y = pHeight / 2;
+  pillar.position.z = 500 - pSide / 2;
+  
+	pillar = new THREE.Mesh(new THREE.BoxGeometry(pSide, pHeight, pSide), new THREE.MeshPhongMaterial({
+    color: 0x002c00,
+    side: THREE.DoubleSide
+  }));
+  scene.add(pillar);
+  pillar.position.x = -250 + pSide / 2;
+ 	pillar.position.y = pHeight / 2;
+  pillar.position.z = 500 - pSide / 2;
+  
+	pillar = new THREE.Mesh(new THREE.BoxGeometry(pSide, pHeight, pSide), new THREE.MeshPhongMaterial({
+    color: 0x002c00,
+    side: THREE.DoubleSide
+  }));
+  scene.add(pillar);
+  pillar.position.x = 250 - pSide / 2;
+ 	pillar.position.y = pHeight / 2;
+  pillar.position.z = -500 + pSide / 2;
+  
+	pillar = new THREE.Mesh(new THREE.BoxGeometry(pSide, pHeight, pSide), new THREE.MeshPhongMaterial({
+    color: 0x002c00,
+    side: THREE.DoubleSide
+  }));
+  scene.add(pillar);
+  pillar.position.x = -250 + pSide / 2;
+ 	pillar.position.y = pHeight / 2;
+  pillar.position.z = -500 + pSide / 2;
+  
+  //table flat
+  var fHeight = 40;
+  var flat = new THREE.Mesh(new THREE.BoxGeometry(500, fHeight, 1000), new THREE.MeshPhongMaterial({
+    color: 0xdd1b1b,
+    side: THREE.DoubleSide
+  }));
+  scene.add(flat);
+  flat.position.y = pHeight + fHeight / 2;
+  pickables = [flat];
+  
+  //wall
+  var wall, plane;
+  wall = new THREE.Mesh(new THREE.BoxGeometry(30, 30, 1000), new THREE.MeshPhongMaterial({
+    color: 0xba8320,
+    side: THREE.DoubleSide
+  }));
+  wall.position.x = 250 - 30 / 2;
+  wall.position.y = pHeight + fHeight + 30 / 2;
+  plane = new Plane(new THREE.Vector3(-5, 0, 0), new THREE.Vector3(-5, 0, 0), wall);
+  plane.update();
+  planes.push(plane);
+  
+  wall = new THREE.Mesh(new THREE.BoxGeometry(500, 30, 30), new THREE.MeshPhongMaterial({
+    color: 0xba8320,
+    side: THREE.DoubleSide
+  }));
+  wall.position.y = pHeight + fHeight + 30 / 2;
+  wall.position.z = 500 - 30 / 2;
+  plane = new Plane(new THREE.Vector3(0, 0, -5), new THREE.Vector3(0, 0, -1), wall);
+  plane.update();
+  planes.push(plane);
+  
+  wall = new THREE.Mesh(new THREE.BoxGeometry(30, 30, 1000), new THREE.MeshPhongMaterial({
+    color: 0xba8320,
+    side: THREE.DoubleSide
+  }));
+  wall.position.x = - 250 + 30 / 2;
+  wall.position.y = pHeight + fHeight + 30 / 2;
+  plane = new Plane(new THREE.Vector3(5, 0, 0), new THREE.Vector3(1, 0, 0), wall);
+  plane.update();
+  planes.push(plane);
+  
+  wall = new THREE.Mesh(new THREE.BoxGeometry(500, 30, 30), new THREE.MeshPhongMaterial({
+    color: 0xba8320,
+    side: THREE.DoubleSide
+  }));
+  wall.position.y = pHeight + fHeight + 30 / 2;
+  wall.position.z = -500 + 30 / 2;
+  plane = new Plane(new THREE.Vector3(0, 0, 5), new THREE.Vector3(0, 0, 1), wall);
+  plane.update();
+  planes.push(plane);
+  /*------------table end------------*/
+  
+  //puck
+  var puck, motioningPuck;
+  puck = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 10, 32), new THREE.MeshPhongMaterial({
+    color: 0x0000cc,
+    side: THREE.DoubleSide
+  }));
+  motioningPuck = new motionPuck(puck, 10, 0x0000cc, audio);
+  motioningPuck.pos.set(0, pHeight + fHeight + 10 / 2, 0);
+  motioningPuck.vel.set(50, 0, 50);
+  pucks.push(motioningPuck);
+  
+  //sun
+  var sun;
+  sun = new THREE.PointLight(0xffffff, 1);
+  sun.position.set(500, 750, 0);
+  scene.add(sun);
+  
+  sun = new THREE.PointLight(0xffffff, 1);
+  sun.position.set(-500, 750, 0);
+  scene.add(sun);
+  
+  sun = new THREE.PointLight(0xffffff, 1);
+  sun.position.set(0, 750, 1000);
+  scene.add(sun);
+  
+  sun = new THREE.PointLight(0xffffff, 1);
+  sun.position.set(0, 750, -1000);
+  scene.add(sun);
+  
+  //two link arm
+	twoLinkArm = new TwoLinkArm ();  // global 
+  twoLink = twoLinkArm.init();
+  scene.add (twoLink);
+  twoLink.position.set (0, pHeight + fHeight, -500)
+
+	//////////////////////////////////////
+  twoLinkArm.ccdSys = new CCDSys (fk)
+  twoLinkArm.ccdSys.setCCDAxis (new THREE.Vector3(0,1,0), 0)
+  twoLinkArm.ccdSys.setCCDAxis (new THREE.Vector3(0,1,0), 1)
+  
+  twoLinkArm.target = new THREE.Vector3();
+
+  dot = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 4, 32), new THREE.MeshNormalMaterial());
+  scene.add(dot);
+  dot.position.y = pHeight + fHeight + 2;
+
+	raycaster = new THREE.Raycaster();
+  document.addEventListener('mousemove', onDocumentMouseDown, false);
+  
+  //window resize
+  window.addEventListener('resize', onWindowResize, false);
+}
+
+function onDocumentMouseDown(event) {
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // find intersections
+  raycaster.setFromCamera(mouse, camera);
+  var intersects = raycaster.intersectObjects(pickables);
+  if (intersects.length > 0) {
+    dot.position.copy(intersects[0].point);
+    //twoLinkArm.target.copy (twoLink.worldToLocal (dot.position.clone()) )
+  }
+}
+
+function animate() {
+  pucks.forEach(function(p) {
+    p.update(0.1)
+  });
+  
+  time = clock.getElapsedTime();
+  //console.log(time);
+
+	twoLinkArm.target.copy (twoLink.worldToLocal (pucks[0].pos.clone().add(pucks[0].vel.clone().multiplyScalar(0.1))) )
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+	update();
+  renderer.render(scene, camera);
+}
+
+function update() {
+	var thetas = [twoLinkArm.theta1, twoLinkArm.theta2];
+	twoLinkArm.ccdSys.solve (twoLinkArm.target, thetas);
+	twoLinkArm.update (thetas)
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+</script>
+
+</body>
+</html>
+
+
