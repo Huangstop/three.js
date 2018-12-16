@@ -486,14 +486,14 @@ THREE.MD2CharacterComplex = function () {
 		}
 
 		// actions
-
+*/
 		if ( controls.jump ) {  // you can add these if necessary
 
 			moveAnimation = animations[ "jump" ];
 			idleAnimation = animations[ "jump" ];
 
 		}
-
+/*
 		if ( controls.attack ) {
 
 			if ( controls.crouch ) {

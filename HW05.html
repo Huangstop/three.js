@@ -1,4 +1,10 @@
-﻿
+﻿<!--		HW05_server_helper		--><!--
+用python開server
+輸入
+(Python.exe.所在之資料夾 )\python.exe  -m http.server
+伺服器開啟後
+在chrome網址打localhost:8000
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,12 +39,19 @@
 <body>
 <div id="info">
 	<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - MD2 Loader -
-	<br />
-	use arrows to control characters, mouse for camera
-	
+	<br/>
+	use arrows or WASD to control characters, mouse for camera
+	<br/>
+	Z to attack, X to jump, C to crouch
+	<br>pls press play to play music<h5>
+	<button id="play" style="width:20%">Play</button>
 	<br>
 	<p id='msg'></p>
 </div>
+
+<audio id="soundtrack" autoplay loop style="display:none">
+<source src="music/LeviathanMagnaSen.mp3" type='audio/mp3'>
+</audio>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/94/three.min.js"></script>
 <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
@@ -70,7 +83,8 @@ class MD2Wrapper {
 			this.root.position.z = pos.z;
 			
 			// y is automatically set, accoording to scale ...				
-			console.log ('y is ' + this.root.position.y)
+			//console.log ('y is ' + this.root.position.y)
+			defaultY = this.root.position.y;
 			
 			scene.add( this.root );
 						
@@ -87,26 +101,44 @@ class MD2Wrapper {
 	var container, stats;
 	var camera, scene, renderer;
 
-	var yoshiWrap;
+	var whamWrap;
 	var light;
 	
 	var box3, box3Helper;
 	
 	var cameraControls;
 	var clock = new THREE.Clock();
+	var defaultY;
+	var treasure;
+	
+	var soundTrack;
+	var isPaused = false;
+
+	$('#play').click ( function() {
+		isPaused = !isPaused;
+		if (isPaused) { 
+			$('#play').text ('Play')
+			soundTrack.pause()
+		} else {
+			$('#play').text ('Pause')
+			soundTrack.play()
+		}
+	});
 
 	init();
 	animate();
 
 	function init() {
-
+		
+		soundTrack = document.getElementById ('soundtrack');
+		
 		container = document.createElement( 'div' );
 		document.body.appendChild( container );
 
 		// CAMERA
 
 		camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 4000 );
-		camera.position.set( 0, 150, 1300 );
+		camera.position.set( 0, 450, -1300 );
 
 		// SCENE
 
@@ -138,7 +170,68 @@ class MD2Wrapper {
 
 		scene.add( light );
 		// scene.add( new THREE.CameraHelper( light.shadow.camera ) );
-
+		
+		/*     laddar     */
+		var ll = 500, lw = 100, lh = 50;
+		var preposy = lh / 2;
+		var preposz = lw / 2 + 200;
+		var ladder, plane;
+		ladder = new THREE.Mesh(new THREE.BoxGeometry(ll, lh, lw), new THREE.MeshPhongMaterial({
+			color: 0x2c0000,
+			side: THREE.DoubleSide
+		}));
+		scene.add(ladder);
+		ladder.position.y += preposy + lh * 0;
+		ladder.position.z = preposz + lw * 1;
+		
+		ladder = new THREE.Mesh(new THREE.BoxGeometry(ll, lh, lw), new THREE.MeshPhongMaterial({
+			color: 0x2c0000,
+			side: THREE.DoubleSide
+		}));
+		scene.add(ladder);
+		ladder.position.y += preposy + lh * 1;
+		ladder.position.z = preposz + lw * 2;
+		
+		ladder = new THREE.Mesh(new THREE.BoxGeometry(ll, lh, lw), new THREE.MeshPhongMaterial({
+			color: 0x2c0000,
+			side: THREE.DoubleSide
+		}));
+		scene.add(ladder);
+		ladder.position.y += preposy + lh * 2;
+		ladder.position.z = preposz + lw * 3;
+		
+		ladder = new THREE.Mesh(new THREE.BoxGeometry(ll, lh, lw), new THREE.MeshPhongMaterial({
+			color: 0x2c0000,
+			side: THREE.DoubleSide
+		}));
+		scene.add(ladder);
+		ladder.position.y += preposy + lh * 3;
+		ladder.position.z = preposz + lw * 4;
+		
+		ladder = new THREE.Mesh(new THREE.BoxGeometry(ll, lh, lw), new THREE.MeshPhongMaterial({
+			color: 0x2c0000,
+			side: THREE.DoubleSide
+		}));
+		scene.add(ladder);
+		ladder.position.y += preposy + lh * 4;
+		ladder.position.z = preposz + lw * 5;
+		
+		plane =  new THREE.Mesh(new THREE.BoxGeometry(ll, lh, 2000), new THREE.MeshPhongMaterial({
+			color: 0x2c0000,
+			side: THREE.DoubleSide
+		}));
+		scene.add(plane);
+		plane.position.y = preposy + lh * 4;
+		plane.position.z = preposz + lw * 5 + 1000;
+		
+		treasure = new THREE.Mesh(new THREE.BoxGeometry(50, 50, 50), new THREE.MeshPhongMaterial({
+			color: 0xffd700,
+			side: THREE.DoubleSide
+		}));
+		scene.add(treasure);
+		treasure.position.y = preposy + lh * 8;
+		treasure.position.z = preposz + lw * 5 + 1000;
+		
 
 		//  GROUND
 
@@ -187,28 +280,28 @@ class MD2Wrapper {
 		cameraControls.update();
 
 		/////////////////////////////////////////////////////////////////////////////
-		// CHARACTER: yoshi
+		// CHARACTER: wham
 
-		let configYoshi = {
+		let configwham = {
 
-			baseUrl: "md2models/yoshi/",
+			baseUrl: "md2models/q2mdl-wham/",
 
-			body: "tris.md2",
-			skins: [ "yoshi.png" ],
+			body: "tris.MD2",
+			skins: [ "tundra.png" ],
 			weapons:  [  ],
 
 			animations: {
-				move: "run",
-				idle: "stand",
-				jump: "jump",
-				attack: "attack",
-				crouchMove: "cwalk",
-				crouchIdle: "cstand",
-				crouchAttach: "crattack"
+				move: "wrun",
+				idle: "wstnd",
+				jump: "wjump",
+				attack: "wattak",
+				crouchMove: "wcwlk",
+				crouchIdle: "wcrch",
+				crouchAttach: "wcatak"
 			},
 
-			walkSpeed: 350, //translation speed
-			crouchSpeed: 175
+			walkSpeed: 500, //translation speed
+			crouchSpeed: 200
 
 		};
 		let controls = {
@@ -220,16 +313,17 @@ class MD2Wrapper {
 
 		};
 
-		yoshiWrap = new MD2Wrapper (configYoshi, controls, new THREE.Vector3(0,0,0), 3 );
+		whamWrap = new MD2Wrapper (configwham, controls, new THREE.Vector3(0,0,0), 3 );
 		var gyro = new THREE.Gyroscope();  
 		gyro.add( camera );
 	
 		gyro.add( light, light.target );
-		yoshiWrap.md2.root.add( gyro );		
+		whamWrap.md2.root.add( gyro );
 		
-		box3 = new THREE.Box3();
+		/*     box3 helper     */
+		/*box3 = new THREE.Box3();
 		box3Helper = new THREE.Box3Helper(box3)
-		scene.add ( box3Helper )
+		scene.add ( box3Helper )*/
 
 	}
 
@@ -250,7 +344,7 @@ class MD2Wrapper {
 	function onKeyDown ( event ) {
 
 		event.stopPropagation();
-		let controlsY = yoshiWrap.md2.controls;
+		let controlsY = whamWrap.md2.controls;
 
 		switch( event.keyCode ) {
 
@@ -266,12 +360,14 @@ class MD2Wrapper {
 			case 39: /*right*/
 			case 68: /*D*/    controlsY.moveRight = true; break;
 
-			case 32: /*space*/ controlsY.jump = true; break;
-			// jump: should save the animation before jump
-			// return to that animation, when SPACE is up
-			
+			case 88:{ /*X*/ 
+				controlsY.jump = true; 
+				if(whamWrap.md2.root.position.x < 75 && whamWrap.md2.root.position.x > -75 && whamWrap.md2.root.position.y >= defaultY + 200 && whamWrap.md2.root.position.z < 1900 && whamWrap.md2.root.position.z > 1700)
+					scene.remove(treasure);
+				break;
+			}
 			case 67: /*C*/     controlsY.crouch = true; break;
-			case 17: /*ctrl*/  controlsY.attack = true; break;
+			case 90: /*Z*/  controlsY.attack = true; break;
 
 		}
 
@@ -280,7 +376,7 @@ class MD2Wrapper {
 	function onKeyUp ( event ) {
 
 		event.stopPropagation();
-		let controlsY = yoshiWrap.md2.controls;
+		let controlsY = whamWrap.md2.controls;
 		
 		switch( event.keyCode ) {
 
@@ -296,12 +392,10 @@ class MD2Wrapper {
 			case 39: /*right*/
 			case 68: /*D*/ 	  controlsY.moveRight = false; break;
 
-			case 32: /*space*/ controlsY.jump = false; break;
-			// jump: should save the animation before jump
-			// return to that animation, when SPACE is up
+			case 88: /*X*/ controlsY.jump = false; break;
 
 			case 67: /*C*/     controlsY.crouch = false; break;
-			case 17: /*ctrl*/  controlsY.attack = false; break;
+			case 90: /*Z*/  controlsY.attack = false; break;
 
 		}
 
@@ -317,15 +411,43 @@ class MD2Wrapper {
 	}
 
 	function render() {
-	
-		box3.setFromObject (yoshiWrap.md2.root)
+		/*     box3 helper     */
+		//box3.setFromObject (whamWrap.md2.root)
 		
 		var delta = clock.getDelta();
-		if (yoshiWrap.md2) {
-			yoshiWrap.md2.update (delta)
+		if (whamWrap.md2) {
+			whamWrap.md2.update (delta)
+			/*console.log ('x is ' + whamWrap.md2.root.position.x)
+			console.log ('y is ' + whamWrap.md2.root.position.y)
+			console.log ('z is ' + whamWrap.md2.root.position.z)
+			console.log ('deaultY is ' + defaultY)*/
+			posss();
+			
 		}
 		renderer.render( scene, camera );
 
+	}
+	
+	function posss(){
+		if(whamWrap.md2.root.position.x <=250 && whamWrap.md2.root.position.x >= -250 && whamWrap.md2.root.position.z < 850 + 2000){
+			if(whamWrap.md2.root.position.z < 850 && whamWrap.md2.root.position.z >= 750 && whamWrap.md2.root.position.y >= defaultY + 200 && whamWrap.md2.root.position.y < defaultY + 250)
+				whamWrap.md2.root.position.y += 10;
+			if(whamWrap.md2.root.position.z < 750 && whamWrap.md2.root.position.z >= 650 && whamWrap.md2.root.position.y >= defaultY + 150 && whamWrap.md2.root.position.y < defaultY + 200)
+				whamWrap.md2.root.position.y += 10;
+			if(whamWrap.md2.root.position.z < 650 && whamWrap.md2.root.position.z >= 550 && whamWrap.md2.root.position.y >= defaultY + 100 && whamWrap.md2.root.position.y < defaultY + 150)
+				whamWrap.md2.root.position.y += 10;
+			if(whamWrap.md2.root.position.z < 550 && whamWrap.md2.root.position.z >= 450 && whamWrap.md2.root.position.y >= defaultY + 50 && whamWrap.md2.root.position.y < defaultY + 100)
+				whamWrap.md2.root.position.y += 10;
+			if(whamWrap.md2.root.position.z < 450 && whamWrap.md2.root.position.z >= 350 && whamWrap.md2.root.position.y >= defaultY && whamWrap.md2.root.position.y < defaultY + 50){
+				whamWrap.md2.root.position.y += 10;
+			}
+			if(whamWrap.md2.root.position.y == defaultY && whamWrap.md2.root.position.z >= 350 && whamWrap.md2.root.position.z < 650)
+				whamWrap.md2.root.position.z += 10;
+		}
+		else{
+			if(whamWrap.md2.root.position.y > defaultY)
+				whamWrap.md2.root.position.y -= 10;
+		}
 	}
 
 </script>
