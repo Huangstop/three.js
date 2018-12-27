@@ -1,0 +1,97 @@
+class Agent {
+  constructor(pos, mesh, halfSize) {
+  	this.name = "ythuang";
+    this.pos = pos.clone();
+    this.vel = new THREE.Vector3();
+    this.force = new THREE.Vector3();
+    this.target = null;
+    this.halfSize = halfSize;  // half width
+    this.mesh = mesh;
+    this.MAXSPEED = 500;
+    this.ARRIVAL_R = 25;
+    
+    // for orientable agent
+    this.angle = 0;
+  }
+  
+  update(dt) {
+  
+  	// about target ...
+  	if (! this.target) {  // no target
+  	  console.log ('find target')
+  		this.findTarget();
+  		return;  // wait for next turn ...
+  	}
+  	
+    this.accumulateForce();
+    
+    // collision
+    // for all obstacles in the scene
+    let obs = scene.obstacles;
+	
+    // pick the most threatening one
+    // apply the repulsive force
+    // (write your code here)
+	
+	for(var count = 0; count < obs.length; count++){
+		if (obs[count].center.distanceTo (this.pos) < obs[count].size * 1.83)
+			this.vel = obs[count].center.clone().sub(this.pos).normalize().multiplyScalar(Math.cos(15)*26).add(this.vel.multiplyScalar(0.936));
+	}
+
+	// Euler's method       
+    this.vel.add(this.force.clone().multiplyScalar(dt));
+
+
+    // velocity modulation
+    let diff = this.target.pos.clone().sub(this.pos)
+    let dst = diff.length();
+    if (dst < this.ARRIVAL_R) {
+      this.vel.setLength(dst)
+      const REACH_TARGET = 5;
+      if (dst < REACH_TARGET) {// target reached
+      	//debugger;
+      	console.log ('target reached');
+         this.target.setFound (this);
+         this.target = null;
+      }
+    }
+    
+    // Euler
+    this.pos.add(this.vel.clone().multiplyScalar(dt))
+    this.mesh.position.copy(this.pos)
+    
+    // for orientable agent
+    // non PD version
+    if (this.vel.length() > 0.1) {
+	    	this.angle = Math.atan2 (-this.vel.z, this.vel.x)
+    		this.mesh.rotation.y = this.angle
+   	}
+  }
+
+  findTarget () {
+  	console.log ('total: ' + scene.targets.length)
+  	let allTargets = scene.targets;
+  	let minD = 1e10;
+  	let d;
+  	for (let i = 0; i < allTargets.length; i++) {
+  		d = this.pos.distanceTo (allTargets[i].pos)
+  		if (d < minD) {
+  			minD = d;
+  			this.setTarget (allTargets[i])
+  		}
+  	}
+  }
+  
+  setTarget(target) {
+    this.target = target
+  }
+  targetInducedForce(targetPos) {
+    return targetPos.clone().sub(this.pos).normalize().multiplyScalar(this.MAXSPEED).sub(this.vel)
+  }
+
+  accumulateForce() {
+    // seek
+    this.force.copy(this.targetInducedForce(this.target.pos));
+  }
+
+}
