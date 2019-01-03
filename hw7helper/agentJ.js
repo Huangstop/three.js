@@ -132,7 +132,7 @@ class Agent {
 	let point = this.pos.clone().sub(this.enemy.pos);
 	let d = point.length();
 	if(d < 50){
-		push.add(point.setlength(250 / d));
+		push.add(point.setLength(250 / d));
 		this.force.add(push);
 	}
   }
