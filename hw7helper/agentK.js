@@ -120,10 +120,21 @@ class Agent {
   targetInducedForce(targetPos) {
     return targetPos.clone().sub(this.pos).normalize().multiplyScalar(this.MAXSPEED).sub(this.vel)
   }
-
+	setEnemy(otherAgent){
+		this.enemy = otherAgent;
+	}
   accumulateForce() {
     // seek
     this.force.copy(this.targetInducedForce(this.target.pos));
+	
+	//seperation
+	let push = new THREE.Vector3();
+	let point = this.pos.clone().sub(this.enemy.pos);
+	let d = point.length();
+	if(d < 50){
+		push.add(point.setlength(250 / d));
+		this.force.add(push);
+	}
   }
 
 }
