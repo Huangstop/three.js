@@ -7,8 +7,8 @@ class Agent {
     this.target = null;
     this.halfSize = halfSize;  // half width
     this.mesh = mesh;
-    this.MAXSPEED = 500;
-    this.ARRIVAL_R = 25;
+    this.MAXSPEED = 10000;
+    this.ARRIVAL_R = 5;
     
     // for orientable agent
     this.angle = 0;
@@ -32,11 +32,19 @@ class Agent {
     // pick the most threatening one
     // apply the repulsive force
     // (write your code here)
+	var count;
 	
-	for(var count = 0; count < obs.length; count++){
-		if (obs[count].center.distanceTo (this.pos) < obs[count].size * 1.83)
-			this.vel = obs[count].center.clone().sub(this.pos).normalize().multiplyScalar(Math.cos(15)*26).add(this.vel.multiplyScalar(0.936));
+	for(count = 0; count < obs.length; count++){
+		if(obs[count].center.distanceTo (this.pos) < obs[count].size * 1.75){
+			this.pos = this.pos.clone().sub(this.vel.normalize().multiplyScalar(obs[count].center.distanceTo (this.pos)*0.25));
+			this.vel.multiplyScalar(0.5);
+		}
+		if (obs[count].center.distanceTo (this.pos) < obs[count].size * 2){
+			this.vel = obs[count].center.clone().sub(this.pos).normalize().multiplyScalar(-500).add(this.vel.multiplyScalar(1));
+		}
 	}
+	if(this.target != null && this.pos.clone().distanceTo(this.target.pos) < 250 && this.pos.clone().distanceTo(this.target.pos) > 3)
+		this.vel.multiplyScalar(0.925);
 
 	// Euler's method       
     this.vel.add(this.force.clone().multiplyScalar(dt));
